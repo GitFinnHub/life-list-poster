@@ -1,0 +1,156 @@
+"""Approximate adult body length (bill tip to tail tip, cm) by family, so the
+poster can size each bird roughly to real-world scale.
+
+There's no reliable open dataset with per-species measurements (Wikidata's
+coverage is under 15% for common North American species), so this is a
+curated family-level reference instead: good enough to make a hummingbird
+look tiny next to a heron, without needing per-species precision.
+Numbers are rough field-guide-level midpoints, not scientific measurements.
+"""
+
+# family common name (matches eBird taxonomy FAMILY_COM_NAME) -> length in cm
+FAMILY_LENGTH_CM = {
+    "Hawks, Eagles, and Kites": 55, "Osprey": 60, "Secretarybird": 130,
+    "Owlet-nightjars": 25,
+    "Ducks, Geese, and Waterfowl": 55, "Magpie Goose": 85, "Screamers": 85,
+    "Hummingbirds": 10, "Swifts": 15, "Treeswifts": 20,
+    "Kiwis": 45,
+    "Hoopoes": 28, "Hornbills": 70, "Woodhoopoes and Scimitarbills": 35,
+    "Nightjars and Allies": 25,
+    "Seriemas": 75,
+    "Cassowaries and Emu": 160,
+    "New World Vultures": 70,
+    "Auks, Murres, and Puffins": 35, "Buttonquail": 15, "Crab-Plover": 38,
+    "Egyptian Plover": 20, "Gulls, Terns, and Skimmers": 42, "Ibisbill": 40,
+    "Jacanas": 25, "Magellanic Plover": 20, "Oystercatchers": 45,
+    "Painted-Snipes": 25, "Plains-wanderer": 17, "Plovers and Lapwings": 25,
+    "Pratincoles and Coursers": 25, "Sandpipers and Allies": 22,
+    "Seedsnipes": 25, "Sheathbills": 40, "Skuas and Jaegers": 50,
+    "Stilts and Avocets": 40, "Thick-knees": 42,
+    "Storks": 100,
+    "Mousebirds": 33,
+    "Pigeons and Doves": 30,
+    "Bee-eaters": 25, "Ground-Rollers": 30, "Kingfishers": 25, "Motmots": 38,
+    "Rollers": 30, "Todies": 11,
+    "Cuckoos": 30,
+    "Kagu": 55, "Sunbittern": 45,
+    "Falcons and Caracaras": 40,
+    "Guans, Chachalacas, and Curassows": 65, "Guineafowl": 55,
+    "Megapodes": 45, "New World Quail": 25, "Pheasants, Grouse, and Allies": 55,
+    "Loons": 70,
+    "Cranes": 110, "Finfoots": 45, "Flufftails": 15, "Limpkin": 65,
+    "Rails, Gallinules, and Coots": 28, "Trumpeters": 50,
+    "Cuckoo-roller": 45,
+    "Mesites": 30,
+    "Turacos": 45,
+    "Potoos": 40,
+    "Hoatzin": 65,
+    "Bustards": 70,
+    # Passeriformes
+    "Accentors": 15, "African Warblers": 12, "African and Green Broadbills": 15,
+    "Antpittas": 16, "Antthrushes": 18, "Asian and Grauer's Broadbills": 22,
+    "Asities": 14, "Australasian Robins": 13, "Australasian Treecreepers": 16,
+    "Australo-Papuan Bellbirds": 25, "Bearded Reedling": 16,
+    "Berrypeckers and Longbills": 12, "Birds-of-Paradise": 30, "Boatbills": 20,
+    "Bowerbirds": 28, "Bristlebirds": 20, "Bristlehead": 25, "Bulbuls": 20,
+    "Bush Warblers and Allies": 12, "Bushshrikes and Allies": 20,
+    "Cardinals and Allies": 20, "Chat-Tanagers": 20, "Cisticolas and Allies": 11,
+    "Cotingas": 25, "Crescentchests": 12, "Crested Jayshrike": 25,
+    "Crows, Jays, and Magpies": 42, "Cuban Warblers": 12, "Cuckooshrikes": 24,
+    "Cupwings": 10, "Dapple-throat and Allies": 15, "Dippers": 19,
+    "Donacobius": 21, "Drongos": 28, "Fairy Flycatchers": 12,
+    "Fairy-bluebirds": 25, "Fairywrens": 13, "Fantails": 16,
+    "Finches, Euphonias, and Allies": 14, "Flowerpeckers": 10,
+    "Gnatcatchers": 11, "Gnateaters": 15, "Grassbirds and Allies": 15,
+    "Greater Antillean Tanagers": 17, "Ground Babblers and Allies": 17,
+    "Hawaiian Honeyeaters": 15, "Honeyeaters": 17, "Hylias": 11, "Hyliotas": 10,
+    "Hylocitrea": 17, "Hypocolius": 21, "Ifrita": 12, "Ioras": 14,
+    "Kinglets": 9, "Larks": 16, "Laughingthrushes and Allies": 24,
+    "Leaf Warblers": 11, "Leafbirds": 20, "Logrunners": 20,
+    "Long-tailed Tits": 14, "Longspurs and Snow Buntings": 16, "Lyrebirds": 80,
+    "Malagasy Warblers": 12, "Manakins": 11, "Melampittas": 18,
+    "Mitrospingid Tanagers": 17, "Mockingbirds and Thrashers": 24,
+    "Monarch Flycatchers": 15, "Mottled Berryhunter": 18,
+    "New World Sparrows": 15, "New World Warblers": 12, "New Zealand Wrens": 9,
+    "Nicators": 20, "Nuthatches": 12, "Old World Buntings": 15,
+    "Old World Flycatchers": 13, "Old World Orioles": 25, "Old World Sparrows": 15,
+    "Olive Warbler": 14, "Ovenbirds and Woodcreepers": 18, "Oxpeckers": 20,
+    "Palmchat": 20, "Pardalotes": 10, "Parrotbills": 12, "Penduline-Tits": 10,
+    "Pittas": 18, "Ploughbill": 15, "Przevalski's Pinktail": 18,
+    "Pseudo-Babblers": 20, "Quail-thrushes and Jewel-babblers": 22,
+    "Rail-babbler": 25, "Reed Warblers and Allies": 13, "Rockfowl": 27,
+    "Rockjumpers": 25, "Royal Flycatchers and Allies": 16, "Sapayoa": 15,
+    "Satinbirds": 22, "Scrub-birds": 18, "Sharpbill": 16, "Shrike-tits": 17,
+    "Shrikes": 24, "Silky-flycatchers": 20, "Sittellas": 11,
+    "Spotted Creepers": 14, "Spotted Elachura": 10, "Starlings": 20,
+    "Stitchbird": 18, "Sugarbirds": 30, "Sunbirds and Spiderhunters": 12,
+    "Swallows": 15, "Sylviid Warblers and Allies": 12, "Tanagers and Allies": 15,
+    "Tapaculos": 14, "Thornbills and Allies": 10, "Thrush-Tanager": 17,
+    "Thrushes and Allies": 23, "Tit Berrypecker and Crested Berrypecker": 13,
+    "Tits, Chickadees, and Titmice": 13, "Tityras and Allies": 20,
+    "Tree-Babblers, Scimitar-Babblers, and Allies": 20, "Treecreepers": 13,
+    "Troupials and Allies": 20, "Typical Antbirds": 14, "Tyrant Flycatchers": 16,
+    "Vangas, Helmetshrikes, and Allies": 22, "Vireos, Shrike-Babblers, and Erpornis": 13,
+    "Wagtails and Pipits": 17, "Wallcreeper": 16, "Wattle-eyes and Batises": 11,
+    "Wattlebirds": 35, "Waxbills and Allies": 11, "Waxwings": 19,
+    "Weavers and Allies": 15, "Whipbirds and Wedgebills": 22,
+    "Whistlers and Allies": 17, "White-eyes, Yuhinas, and Allies": 11,
+    "White-winged Chough and Apostlebird": 33, "Whiteheads": 15,
+    "Whydahs and Indigobirds": 12, "Woodswallows, Bellmagpies, and Allies": 25,
+    "Wrens": 12, "Wrenthrush": 11, "Yellow Flycatchers": 12,
+    "Yellow-breasted Chat": 18,
+    # Pelecaniformes and allies
+    "Hamerkop": 56, "Herons, Egrets, and Bitterns": 70, "Ibises and Spoonbills": 65,
+    "Pelicans": 150, "Shoebill": 115,
+    "Tropicbirds": 45,
+    "Flamingos": 130,
+    "African Barbets": 18, "Asian Barbets": 25, "Honeyguides": 15,
+    "Jacamars": 22, "New World Barbets": 18, "Puffbirds": 22,
+    "Toucan-Barbets": 20, "Toucans": 50, "Woodpeckers": 24,
+    "Frogmouths": 40,
+    "Grebes": 35,
+    "Albatrosses": 90, "Northern Storm-Petrels": 18, "Shearwaters and Petrels": 40,
+    "Southern Storm-Petrels": 18,
+    "Cockatoos": 45, "New World and African Parrots": 28,
+    "New Zealand Parrots": 40, "Old World Parrots": 28,
+    "Sandgrouse": 30,
+    "Rheas": 130,
+    "Penguins": 65,
+    "Oilbird": 45,
+    "Barn-Owls": 35, "Owls": 35,
+    "Ostriches": 220,
+    "Anhingas": 85, "Boobies and Gannets": 80, "Cormorants and Shags": 75,
+    "Frigatebirds": 95,
+    "Tinamous": 30,
+    "Trogons": 30,
+}
+
+# order -> length cm, used only when a family isn't in the table above
+# (e.g. a future eBird taxonomy update adds a family we haven't seen).
+ORDER_LENGTH_CM = {
+    "Accipitriformes": 55, "Aegotheliformes": 25, "Anseriformes": 55,
+    "Apodiformes": 13, "Apterygiformes": 45, "Bucerotiformes": 45,
+    "Caprimulgiformes": 25, "Cariamiformes": 75, "Casuariiformes": 160,
+    "Cathartiformes": 70, "Charadriiformes": 32, "Ciconiiformes": 100,
+    "Coliiformes": 33, "Columbiformes": 30, "Coraciiformes": 28,
+    "Cuculiformes": 30, "Eurypygiformes": 50, "Falconiformes": 40,
+    "Galliformes": 50, "Gaviiformes": 70, "Gruiformes": 40,
+    "Leptosomiformes": 45, "Mesitornithiformes": 30, "Musophagiformes": 45,
+    "Nyctibiiformes": 40, "Opisthocomiformes": 65, "Otidiformes": 70,
+    "Passeriformes": 16, "Pelecaniformes": 75, "Phaethontiformes": 45,
+    "Phoenicopteriformes": 130, "Piciformes": 25, "Podargiformes": 40,
+    "Podicipediformes": 35, "Procellariiformes": 40, "Psittaciformes": 30,
+    "Pterocliformes": 30, "Rheiformes": 130, "Sphenisciformes": 65,
+    "Steatornithiformes": 45, "Strigiformes": 35, "Struthioniformes": 220,
+    "Suliformes": 80, "Tinamiformes": 30, "Trogoniformes": 30,
+}
+
+DEFAULT_LENGTH_CM = 18
+
+
+def length_cm(family_common, order):
+    if family_common in FAMILY_LENGTH_CM:
+        return FAMILY_LENGTH_CM[family_common]
+    if order in ORDER_LENGTH_CM:
+        return ORDER_LENGTH_CM[order]
+    return DEFAULT_LENGTH_CM

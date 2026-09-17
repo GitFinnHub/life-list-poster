@@ -1,0 +1,4 @@
+pandas>=2.2
+requests>=2.31
+rembg[cpu]>=2.0
+Pillow>=10.0
