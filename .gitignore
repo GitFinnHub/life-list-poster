@@ -10,10 +10,11 @@ output/
 # Personal data - never commit someone's eBird sighting history
 data/MyEBirdData.csv
 
-# Local DB / env files (once the web app exists)
+# Local DB / env files / uploads (web app runtime state)
 *.db
 *.sqlite3
 .env
+app_data/
 
 # Claude Code session internals
 .claude/

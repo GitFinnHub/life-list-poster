@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>A Life List — Poster Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'EB Garamond', serif; background: #f4efe3; color: #2b2420; max-width: 640px; margin: 60px auto; padding: 0 20px; line-height: 1.5; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .sub { font-style: italic; color: #6b5e4e; margin-top: 0; }
+  label { display: block; margin-top: 22px; font-style: italic; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 10px; font-family: inherit; font-size: 1rem; border: 1px solid #b8a47e; background: transparent; color: inherit; }
+  input[type=file] { margin-top: 8px; }
+  button { margin-top: 30px; padding: 12px 28px; background: #2b2420; color: #f4efe3; border: none; font-family: inherit; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+  button:hover { background: #4a4036; }
+  .hint { font-size: 0.9rem; color: #6b5e4e; margin-top: 8px; }
+  .error { color: #a33; margin-top: 20px; padding: 12px; border: 1px solid #a33; }
+</style>
+</head>
+<body>
+  <h1>A Life List</h1>
+  <p class="sub">Turn your eBird life list into a poster.</p>
+  <p>Export your data from eBird.org &rarr; My eBird &rarr; Download My Data, then upload the CSV below.</p>
+  <form action="/jobs" method="post" enctype="multipart/form-data">
+    <label>Your name
+      <input type="text" name="visitor_name" required>
+    </label>
+    <label>Poster title
+      <input type="text" name="title" value="A Life List">
+    </label>
+    <label>Your eBird export (.csv)
+      <input type="file" name="csv_file" accept=".csv" required>
+    </label>
+    <div class="hint">This can take 10-20 minutes for a large life list, longer if someone else's poster is already being built.</div>
+    <button type="submit">Make my poster</button>
+  </form>
+</body>
+</html>

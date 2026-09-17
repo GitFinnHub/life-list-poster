@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Building your poster…</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'EB Garamond', serif; background: #f4efe3; color: #2b2420; max-width: 640px; margin: 60px auto; padding: 0 20px; text-align: center; line-height: 1.5; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+  .bar-track { background: #e5ddc8; border: 1px solid #b8a47e; height: 24px; margin: 30px 0 10px; }
+  .bar-fill { background: #2b2420; height: 100%; width: 3%; transition: width 0.6s; }
+  #note { font-style: italic; color: #6b5e4e; }
+  img { max-width: 100%; margin-top: 30px; border: 1px solid #b8a47e; }
+  .actions { margin-top: 20px; }
+  a.btn { display: inline-block; margin: 6px; padding: 12px 28px; background: #2b2420; color: #f4efe3; text-decoration: none; letter-spacing: 1px; text-transform: uppercase; font-size: 0.9rem; }
+  .error { color: #a33; }
+</style>
+</head>
+<body>
+  <h1>Building your poster</h1>
+  <div id="content">
+    <div class="bar-track"><div class="bar-fill" id="bar"></div></div>
+    <div id="note">Starting up…</div>
+  </div>
+  <script>
+    const statusUrl = window.location.pathname + '/status';
+    async function poll() {
+      let job;
+      try {
+        const res = await fetch(statusUrl);
+        job = await res.json();
+      } catch (e) {
+        setTimeout(poll, 4000);
+        return;
+      }
+      if (job.status === 'done') {
+        const base = window.location.pathname;
+        document.getElementById('content').innerHTML =
+          '<img src="' + base + '/poster.png" alt="Your poster">' +
+          '<div class="actions">' +
+          '<a class="btn" href="' + base + '/poster.png" download>Download poster</a>' +
+          '<a class="btn" href="' + base + '/credits.txt" download>Photo credits</a>' +
+          '<a class="btn" href="/">Make another</a>' +
+          '</div>';
+        return;
+      }
+      if (job.status === 'error') {
+        document.getElementById('content').innerHTML =
+          '<p class="error">Something went wrong: ' + (job.error_message || 'unknown error') + '</p>' +
+          '<div class="actions"><a class="btn" href="/">Try again</a></div>';
+        return;
+      }
+      const pct = job.progress_total ? Math.max(5, Math.round(100 * job.progress_current / job.progress_total)) : 5;
+      document.getElementById('bar').style.width = pct + '%';
+      let note;
+      if (job.status === 'queued') {
+        note = job.queue_position > 0
+          ? job.queue_position + ' poster(s) ahead of yours in the queue'
+          : 'Next up...';
+      } else {
+        note = (job.progress_note || 'Working...') + ' (' + job.progress_current + '/' + job.progress_total + ')';
+      }
+      document.getElementById('note').textContent = note;
+      setTimeout(poll, 3000);
+    }
+    poll();
+  </script>
+</body>
+</html>
