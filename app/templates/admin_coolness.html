@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Coolness rankings (admin)</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'EB Garamond', serif; background: #f4efe3; color: #2b2420; max-width: 700px; margin: 40px auto 100px; padding: 0 20px; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e5ddc8; }
+  input[type=number] { width: 60px; font-family: inherit; padding: 4px; border: 1px solid #b8a47e; background: #fbf8f0; color: inherit; }
+  .sci { font-style: italic; color: #6b5e4e; font-size: 0.85rem; }
+  button { margin-top: 20px; padding: 10px 24px; background: #2b2420; color: #f4efe3; border: none; font-family: inherit; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+  .empty { font-style: italic; color: #6b5e4e; margin-top: 30px; }
+</style>
+</head>
+<body>
+  <h1>Coolness rankings</h1>
+  <p>0-100, 50 is neutral (unranked species render exactly as they do today). Higher means bigger on the poster. Species appear here once at least one visitor's poster has looked them up.</p>
+  {% if species %}
+  <form method="post" action="/admin/coolness">
+    <table>
+      <tr><th>Species</th><th>Score</th></tr>
+      {% for sp in species %}
+      <tr>
+        <td>{{ sp.common_name }}<br><span class="sci">{{ sp.scientific_name }}</span></td>
+        <td><input type="number" name="score_{{ sp.species_code }}" min="0" max="100" value="{{ sp.score }}"></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <button type="submit">Save rankings</button>
+  </form>
+  {% else %}
+  <p class="empty">No species yet — they'll show up here once someone's poster has been through the candidate-gathering step.</p>
+  {% endif %}
+</body>
+</html>

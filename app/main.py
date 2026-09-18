@@ -1,7 +1,7 @@
-"""Phase 1: upload -> queue -> background worker runs the existing CLI
-pipeline unmodified -> poll for status -> download. No photo picker or
-coolness ranking yet (Phase 2/3); this proves the web/job plumbing works
-end to end against the exact same pipeline the CLI tool already uses.
+"""Upload -> gather candidate photos -> customize (pick photos + nudge
+coolness, both optional) -> render -> download. Background worker (see
+worker.py) does the actual pipeline work; this module is just routing and
+DB reads/writes for the web-facing flow.
 """
 import datetime
 import sys
@@ -17,13 +17,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 from lib import life_list  # noqa: E402
 
-from . import db  # noqa: E402
+from . import db, photo_library  # noqa: E402
 from .worker import start_worker  # noqa: E402
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 UPLOAD_TMP_DIR = ROOT / "app_data" / "uploads"
 TAXONOMY_PATH = ROOT / "data" / "ebird_taxonomy.csv"
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # an eBird export is a few hundred KB at most
+PICKER_CANDIDATE_LIMIT = 4
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 _taxonomy_df = None  # loaded once at startup, reused for every upload
@@ -82,7 +83,7 @@ async def create_job(
     with db.get_db() as conn:
         conn.execute(
             "INSERT INTO jobs (id, status, visitor_name, title, created_at) VALUES (?,?,?,?,?)",
-            (job_id, "queued", visitor_name, title, now),
+            (job_id, "queued_candidates", visitor_name, title, now),
         )
         conn.executemany(
             """INSERT INTO job_species
@@ -118,15 +119,83 @@ async def job_status_json(job_id: str):
     job = _get_job(job_id)
     if job is None:
         raise HTTPException(404, "Job not found.")
-    if job["status"] == "queued":
+    if job["status"] in ("queued_candidates", "queued"):
         with db.get_db() as conn:
             job["queue_position"] = conn.execute(
-                "SELECT COUNT(*) c FROM jobs WHERE status='queued' AND created_at < ?",
-                (job["created_at"],),
+                "SELECT COUNT(*) c FROM jobs WHERE status=? AND created_at < ?",
+                (job["status"], job["created_at"]),
             ).fetchone()["c"]
     else:
         job["queue_position"] = 0
     return job
+
+
+@app.get("/jobs/{job_id}/customize", response_class=HTMLResponse)
+async def customize_page(request: Request, job_id: str):
+    job = _get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found.")
+    if job["status"] != "picking":
+        return RedirectResponse(f"/jobs/{job_id}")
+
+    with db.get_db() as conn:
+        baselines = {
+            r["species_code"]: r["score"]
+            for r in conn.execute("SELECT species_code, score FROM coolness_baseline").fetchall()
+        }
+
+    species_view = []
+    for sp in _job_species(job_id):
+        code = sp["species_code"]
+        candidates = photo_library.get_or_fetch_candidates(
+            code, sp["scientific_name"], sp["common_name"]
+        )[:PICKER_CANDIDATE_LIMIT]
+        for c in candidates:
+            c["thumb_url"] = photo_library.square_url(c)
+        default_id = photo_library.get_default_candidate_id(code)
+        if default_id is None and candidates:
+            default_id = candidates[0]["id"]
+        species_view.append({
+            **sp,
+            "candidates": candidates,
+            "default_candidate_id": default_id,
+            "baseline_score": baselines.get(code, 50),
+        })
+
+    return templates.TemplateResponse(request, "customize.html", {"job": job, "species": species_view})
+
+
+@app.post("/jobs/{job_id}/customize")
+async def customize_submit(request: Request, job_id: str):
+    job = _get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found.")
+    if job["status"] != "picking":
+        return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+    form = await request.form()
+    for sp in _job_species(job_id):
+        code = sp["species_code"]
+
+        photo_val = form.get(f"photo_{code}")
+        if photo_val:
+            candidate_id = int(photo_val)
+            photo_library.set_default(code, candidate_id, job["visitor_name"])
+            photo_library.record_job_choice(job_id, code, candidate_id)
+
+        cool_val = form.get(f"cool_{code}")
+        if cool_val and int(cool_val) != 0:
+            with db.get_db() as conn:
+                conn.execute(
+                    """INSERT INTO coolness_override (job_id, species_code, delta) VALUES (?,?,?)
+                       ON CONFLICT(job_id, species_code) DO UPDATE SET delta=excluded.delta""",
+                    (job_id, code, int(cool_val)),
+                )
+
+    with db.get_db() as conn:
+        conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (job_id,))
+
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
 @app.get("/jobs/{job_id}/poster.png")
@@ -145,7 +214,51 @@ async def job_credits(job_id: str):
     return FileResponse(job["credits_path"], media_type="text/plain")
 
 
+@app.get("/admin/coolness", response_class=HTMLResponse)
+async def admin_coolness_page(request: Request):
+    # NOTE: unprotected for now - Phase 4 adds the owner-only access gate.
+    with db.get_db() as conn:
+        rows = conn.execute(
+            """SELECT s.species_code, s.common_name, s.scientific_name,
+                      COALESCE(cb.score, 50) AS score
+               FROM species s
+               LEFT JOIN coolness_baseline cb ON cb.species_code = s.species_code
+               ORDER BY s.common_name"""
+        ).fetchall()
+    return templates.TemplateResponse(request, "admin_coolness.html", {"species": [dict(r) for r in rows]})
+
+
+@app.post("/admin/coolness")
+async def admin_coolness_submit(request: Request):
+    form = await request.form()
+    now = datetime.datetime.utcnow().isoformat()
+    with db.get_db() as conn:
+        for key, value in form.items():
+            if not key.startswith("score_"):
+                continue
+            code = key[len("score_"):]
+            try:
+                score = max(0, min(100, int(value)))
+            except ValueError:
+                continue
+            conn.execute(
+                """INSERT INTO coolness_baseline (species_code, score, updated_at) VALUES (?,?,?)
+                   ON CONFLICT(species_code) DO UPDATE SET score=excluded.score, updated_at=excluded.updated_at""",
+                (code, score, now),
+            )
+    return RedirectResponse("/admin/coolness", status_code=303)
+
+
 def _get_job(job_id):
     with db.get_db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
         return dict(row) if row else None
+
+
+def _job_species(job_id):
+    with db.get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM job_species WHERE job_id=? ORDER BY taxon_order",
+            (job_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]

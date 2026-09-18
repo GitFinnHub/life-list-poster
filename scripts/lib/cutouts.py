@@ -45,8 +45,12 @@ def _clean_alpha(img, threshold=ALPHA_CLEAN_THRESHOLD):
     return Image.merge("RGBA", (r, g, b, Image.fromarray(new_a, mode="L")))
 
 
-def get_cutout(code, photo_path, cutouts_dir, manual_dir, log=print):
-    manual_path = manual_dir / f"{code}.png"
+def get_cutout(code, photo_path, cutouts_dir, manual_dir, log=print, manual_code=None):
+    """manual_code lets the cache key (code) carry more than just the
+    species - e.g. species+chosen-photo-id, so different visitors picking
+    different photos for the same species don't collide - while a manual
+    override still only needs to be dropped in by plain species code."""
+    manual_path = manual_dir / f"{manual_code or code}.png"
     if manual_path.exists():
         return manual_path
 

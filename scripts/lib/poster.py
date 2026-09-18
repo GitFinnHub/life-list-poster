@@ -181,14 +181,15 @@ def _pack_variable(items, label_extra, max_width, gap, label_gap):
     return placements, used_w, total_h
 
 
-def _layout(species_rows, image_cache, sizes, fonts):
+def _layout(species_rows, image_cache, sizes, fonts, size_multipliers):
     items = []
     label_extra = {}
     labels = {}
     for sp in species_rows:
         code = sp["species_code"]
         img = image_cache[code]
-        h = sizes.bird_h * _jitter(code)
+        coolness_scale = size_multipliers.get(code, 1.0) if size_multipliers else 1.0
+        h = sizes.bird_h * coolness_scale * _jitter(code)
         w = h * (img.width / img.height)
         items.append((code, w, h))
         lines, font, line_h = _fit_label(sp["common_name"], w + 8, fonts.label)
@@ -201,12 +202,14 @@ def _layout(species_rows, image_cache, sizes, fonts):
     return placements, labels, start_y, total_h
 
 
-def _autofit(species_rows, image_cache):
+def _autofit(species_rows, image_cache, size_multipliers):
     def try_config(width_in, scale):
         canvas_w = width_in * DPI
         sizes = Sizes(canvas_w, scale)
         fonts = Fonts(scale)
-        placements, labels, start_y, total_h = _layout(species_rows, image_cache, sizes, fonts)
+        placements, labels, start_y, total_h = _layout(
+            species_rows, image_cache, sizes, fonts, size_multipliers
+        )
         return sizes, fonts, placements, labels, start_y, total_h
 
     def best_for_width(width_in, min_scale):
@@ -254,7 +257,13 @@ def _draw_badge(draw, x, bottom_y, title, n_species, asof_label, fonts):
     return box_w, box_h
 
 
-def build_poster(life_df, resolved_cutouts, title, subtitle, out_path, asof=None, log=print):
+def build_poster(life_df, resolved_cutouts, title, subtitle, out_path, asof=None, log=print,
+                  size_multipliers=None):
+    """size_multipliers: optional {species_code: scale_factor} - a neutral
+    (missing or 1.0) entry renders exactly as today's baseline sizing;
+    computing the actual coolness score from a baseline+override is the
+    caller's job (see app/coolness.py for the web app), not this module's -
+    poster.py only knows how to apply a size, not why."""
     asof = asof or datetime.date.today()
     if hasattr(asof, "strftime"):
         asof_label = f"{asof.strftime('%B')} {asof.day}, {asof.year}"
@@ -267,7 +276,9 @@ def build_poster(life_df, resolved_cutouts, title, subtitle, out_path, asof=None
         if row["species_code"] in image_cache
     ]
 
-    sizes, fonts, placements, labels, start_y, canvas_h = _autofit(species_rows, image_cache)
+    sizes, fonts, placements, labels, start_y, canvas_h = _autofit(
+        species_rows, image_cache, size_multipliers or {}
+    )
     canvas_h = int(canvas_h)
 
     img = Image.new("RGB", (sizes.canvas_w, canvas_h), CREAM)

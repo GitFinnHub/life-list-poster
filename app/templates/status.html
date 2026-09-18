@@ -33,6 +33,10 @@
         setTimeout(poll, 4000);
         return;
       }
+      if (job.status === 'picking') {
+        window.location = window.location.pathname + '/customize';
+        return;
+      }
       if (job.status === 'done') {
         const base = window.location.pathname;
         document.getElementById('content').innerHTML =
@@ -53,10 +57,13 @@
       const pct = job.progress_total ? Math.max(5, Math.round(100 * job.progress_current / job.progress_total)) : 5;
       document.getElementById('bar').style.width = pct + '%';
       let note;
-      if (job.status === 'queued') {
+      if (job.status === 'queued_candidates' || job.status === 'queued') {
         note = job.queue_position > 0
           ? job.queue_position + ' poster(s) ahead of yours in the queue'
           : 'Next up...';
+      } else if (job.status === 'gathering_photos') {
+        note = 'Looking up photo options for ' + (job.progress_note || '...') +
+          ' (' + job.progress_current + '/' + job.progress_total + ')';
       } else {
         note = (job.progress_note || 'Working...') + ' (' + job.progress_current + '/' + job.progress_total + ')';
       }
