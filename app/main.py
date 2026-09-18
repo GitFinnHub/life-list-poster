@@ -2,18 +2,28 @@
 coolness, both optional) -> render -> download. Background worker (see
 worker.py) does the actual pipeline work; this module is just routing and
 DB reads/writes for the web-facing flow.
+
+Everything's behind one shared password (session cookie) - this is a
+private site for friends/family, not a public signup product, so a single
+password gate is the right amount of access control for now rather than
+building real accounts.
 """
 import datetime
+import os
 import sys
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
 sys.path.insert(0, str(ROOT / "scripts"))
 from lib import life_list  # noqa: E402
 
@@ -25,6 +35,10 @@ UPLOAD_TMP_DIR = ROOT / "app_data" / "uploads"
 TAXONOMY_PATH = ROOT / "data" / "ebird_taxonomy.csv"
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # an eBird export is a few hundred KB at most
 PICKER_CANDIDATE_LIMIT = 4
+PUBLIC_PATHS = {"/login"}
+
+SITE_PASSWORD = os.environ.get("SITE_PASSWORD")
+SESSION_SECRET = os.environ.get("SESSION_SECRET")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 _taxonomy_df = None  # loaded once at startup, reused for every upload
@@ -33,6 +47,11 @@ _taxonomy_df = None  # loaded once at startup, reused for every upload
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _taxonomy_df
+    if not SITE_PASSWORD or not SESSION_SECRET:
+        raise RuntimeError(
+            "SITE_PASSWORD and SESSION_SECRET must be set (see .env.example) "
+            "before starting the server."
+        )
     db.init_db()
     _taxonomy_df = life_list.load_taxonomy(TAXONOMY_PATH)
     start_worker()
@@ -40,6 +59,37 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    if request.url.path not in PUBLIC_PATHS and not request.session.get("authed"):
+        return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+    return await call_next(request)
+
+
+# Registered after require_login so it ends up OUTER in the middleware
+# stack (Starlette wraps later-added middleware around earlier-added ones)
+# and actually runs first, populating request.session before our auth
+# check reads it - added the other way around, request.session isn't
+# available yet and every request 500s.
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET or "dev-only-placeholder",
+                    same_site="lax", max_age=60 * 60 * 24 * 30)
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_form(request: Request, next: str = "/"):
+    return templates.TemplateResponse(request, "login.html", {"next": next, "error": None})
+
+
+@app.post("/login")
+async def login_submit(request: Request, password: str = Form(...), next: str = Form("/")):
+    if password != SITE_PASSWORD:
+        return templates.TemplateResponse(
+            request, "login.html", {"next": next, "error": "Wrong password."}, status_code=401
+        )
+    request.session["authed"] = True
+    return RedirectResponse(next or "/", status_code=303)
 
 
 @app.get("/", response_class=HTMLResponse)
