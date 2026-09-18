@@ -16,6 +16,8 @@
   .thumbs input { position: absolute; opacity: 0; width: 0; height: 0; }
   .thumbs img { width: 56px; height: 56px; object-fit: cover; border: 3px solid transparent; border-radius: 3px; display: block; }
   .thumbs input:checked + img { border-color: #2b2420; }
+  .upload-link { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px dashed #b8a47e; border-radius: 3px; color: #6b5e4e; font-size: 1.6rem; text-decoration: none; line-height: 1; }
+  .upload-link:hover { background: #e5ddc8; }
   select.cool { margin-left: auto; font-family: inherit; padding: 6px; border: 1px solid #b8a47e; background: #fbf8f0; color: inherit; }
   .no-photos { color: #a33; font-style: italic; font-size: 0.85rem; }
   .bar { position: fixed; bottom: 0; left: 0; right: 0; background: #f4efe3; border-top: 1px solid #b8a47e; padding: 16px 20px; text-align: center; }
@@ -43,9 +45,11 @@
           <img src="{{ c.thumb_url }}" alt="{{ sp.common_name }}" loading="lazy">
         </label>
         {% endfor %}
+        <a class="upload-link" href="/jobs/{{ job.id }}/customize/upload/{{ sp.species_code }}" title="Upload your own photo">+</a>
       </div>
       {% else %}
       <div class="no-photos">no photo found — will be left off the poster</div>
+      <a class="upload-link" href="/jobs/{{ job.id }}/customize/upload/{{ sp.species_code }}" title="Upload your own photo">+</a>
       {% endif %}
       <select class="cool" name="cool_{{ sp.species_code }}">
         <option value="0" selected>Normal size</option>

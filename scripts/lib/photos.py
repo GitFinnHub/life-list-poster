@@ -17,6 +17,7 @@ reliable signal than anything measured from the image after the fact.
 import json
 import re
 import time
+from pathlib import Path
 
 import requests
 
@@ -51,8 +52,10 @@ def _large_url(photo):
 
 def _inat_id(photo):
     """Works for both a raw iNaturalist API candidate dict (key 'id') and a
-    candidate_photos DB row adapted to a dict (key 'inat_photo_id')."""
-    return photo.get("inat_photo_id", photo.get("id"))
+    candidate_photos DB row adapted to a dict (key 'inat_photo_id', None for
+    an uploaded photo - use `or`, not dict.get's default, since the key
+    exists with value None rather than being absent)."""
+    return photo.get("inat_photo_id") or photo.get("id")
 
 
 def photo_cache_key(scientific_name, chosen_photo=None):
@@ -105,11 +108,31 @@ def _candidate_photos(taxon_id):
 
 def fetch_photo(scientific_name, common_name, photos_dir, credits, log=print, chosen_photo=None):
     """chosen_photo, when given, skips the taxon/candidate lookup entirely
-    and downloads that specific photo - used by the web app's picker.
-    Needs at least: inat_photo_id (or id), large_url (or medium_url/url),
+    and uses that specific photo - used by the web app's picker. Needs at
+    least: inat_photo_id (or id), large_url (or medium_url/url),
     license_code, attribution. Plain CLI usage (chosen_photo=None) is
-    unchanged: today's curators'-top-pick behavior."""
+    unchanged: today's curators'-top-pick behavior.
+
+    A chosen_photo with source in (admin_upload, visitor_upload) is
+    already sitting on disk (local_path) - someone uploaded it, there's
+    nothing to fetch from iNaturalist for it."""
     code = photo_cache_key(scientific_name, chosen_photo)
+
+    if chosen_photo is not None and chosen_photo.get("source") in ("admin_upload", "visitor_upload"):
+        local_path = Path(chosen_photo["local_path"])
+        if not local_path.exists():
+            log(f"  ! uploaded photo missing on disk for {common_name}: {local_path}")
+            return None
+        credits[code] = {
+            "common_name": common_name,
+            "scientific_name": scientific_name,
+            "attribution": chosen_photo.get("attribution") or "Uploaded photo",
+            "license_code": None,
+            "source": "upload",
+            "source_url": None,
+        }
+        return local_path
+
     dest = photos_dir / f"{code}.jpg"
     if dest.exists():
         return dest
@@ -153,16 +176,15 @@ def fetch_photo(scientific_name, common_name, photos_dir, credits, log=print, ch
 
 
 def save_credits(credits, path):
-    lines = [
-        "Photo credits (source: iNaturalist community observations)",
-        "=" * 60,
-        "",
-    ]
+    lines = ["Photo credits", "=" * 60, ""]
     for entry in sorted(credits.values(), key=lambda e: e["common_name"]):
-        lic = entry["license_code"] or "unknown license"
         lines.append(f"{entry['common_name']} ({entry['scientific_name']})")
-        lines.append(f"  {entry['attribution']}  [{lic}]")
-        lines.append(f"  {entry['source_url']}")
+        if entry["source"] == "upload":
+            lines.append(f"  {entry['attribution']}")
+        else:
+            lic = entry["license_code"] or "unknown license"
+            lines.append(f"  {entry['attribution']}  [{lic}]")
+            lines.append(f"  {entry['source_url']}")
         lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
     path.with_suffix(".json").write_text(json.dumps(credits, indent=2), encoding="utf-8")

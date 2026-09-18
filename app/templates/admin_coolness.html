@@ -13,9 +13,12 @@
   .sci { font-style: italic; color: #6b5e4e; font-size: 0.85rem; }
   button { margin-top: 20px; padding: 10px 24px; background: #2b2420; color: #f4efe3; border: none; font-family: inherit; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
   .empty { font-style: italic; color: #6b5e4e; margin-top: 30px; }
+  nav { margin-bottom: 20px; }
+  nav a { color: #6b5e4e; margin-right: 16px; }
 </style>
 </head>
 <body>
+  <nav><a href="/admin/coolness">Coolness rankings</a> <a href="/admin/photos">Photo library</a></nav>
   <h1>Coolness rankings</h1>
   <p>0-100, 50 is neutral (unranked species render exactly as they do today). Higher means bigger on the poster. Species appear here once at least one visitor's poster has looked them up.</p>
   {% if species %}

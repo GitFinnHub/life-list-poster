@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Photo library (admin)</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'EB Garamond', serif; background: #f4efe3; color: #2b2420; max-width: 800px; margin: 40px auto 100px; padding: 0 20px; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+  .species-row { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #e5ddc8; }
+  .species-name { flex: 1; }
+  .sci { font-style: italic; color: #6b5e4e; font-size: 0.85rem; }
+  .thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 3px; border: 1px solid #b8a47e; }
+  .thumb-empty { width: 56px; height: 56px; border: 1px dashed #b8a47e; border-radius: 3px; }
+  .tag { font-size: 0.75rem; color: #6b5e4e; }
+  a.btn { padding: 8px 16px; background: #2b2420; color: #f4efe3; text-decoration: none; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase; }
+  nav { margin-bottom: 20px; }
+  nav a { color: #6b5e4e; margin-right: 16px; }
+</style>
+</head>
+<body>
+  <nav><a href="/admin/coolness">Coolness rankings</a> <a href="/admin/photos">Photo library</a></nav>
+  <h1>Photo library</h1>
+  <p>Upload your own photo for any species — it becomes everyone's default from then on, tagged "Photo by Finn".</p>
+  {% for sp in species %}
+  <div class="species-row">
+    {% if sp.current_thumb %}
+    <img class="thumb" src="{{ sp.current_thumb }}" alt="">
+    {% else %}
+    <div class="thumb-empty"></div>
+    {% endif %}
+    <div class="species-name">
+      {{ sp.common_name }}<br><span class="sci">{{ sp.scientific_name }}</span>
+      {% if sp.current_source == 'admin_upload' %}<br><span class="tag">Current: Photo by Finn</span>{% endif %}
+    </div>
+    <a class="btn" href="/admin/photos/upload/{{ sp.species_code }}">Upload</a>
+  </div>
+  {% endfor %}
+</body>
+</html>

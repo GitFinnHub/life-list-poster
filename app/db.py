@@ -29,6 +29,9 @@ def get_db():
 # which is overkill for a schema this small).
 _MIGRATIONS = [
     ("jobs", "restart_count", "ALTER TABLE jobs ADD COLUMN restart_count INTEGER NOT NULL DEFAULT 0"),
+    ("candidate_photos", "source", "ALTER TABLE candidate_photos ADD COLUMN source TEXT NOT NULL DEFAULT 'inaturalist'"),
+    ("candidate_photos", "local_path", "ALTER TABLE candidate_photos ADD COLUMN local_path TEXT"),
+    ("candidate_photos", "uploaded_for_job_id", "ALTER TABLE candidate_photos ADD COLUMN uploaded_for_job_id TEXT"),
 ]
 
 

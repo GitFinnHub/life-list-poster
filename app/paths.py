@@ -22,7 +22,14 @@ PHOTOS_DIR = CACHE_DIR / "photos"
 CUTOUTS_DIR = CACHE_DIR / "cutouts"
 MANUAL_DIR = CACHE_DIR / "cutouts_manual"
 
+# User-supplied photos - unlike UPLOAD_TMP_DIR (the raw CSV, deleted right
+# after parsing), these need to persist indefinitely: candidate_photos rows
+# point at them by path for as long as they might get rendered into a poster.
+ADMIN_PHOTOS_DIR = CACHE_DIR / "admin_photos"       # shared - becomes everyone's default
+VISITOR_PHOTOS_DIR = CACHE_DIR / "visitor_photos"   # private - scoped to one job
+
 OUTPUT_DIR = DATA_ROOT / "output" / "jobs"
 
-for d in (APP_DATA_DIR, UPLOAD_TMP_DIR, PHOTOS_DIR, CUTOUTS_DIR, MANUAL_DIR, OUTPUT_DIR):
+for d in (APP_DATA_DIR, UPLOAD_TMP_DIR, PHOTOS_DIR, CUTOUTS_DIR, MANUAL_DIR,
+          ADMIN_PHOTOS_DIR, VISITOR_PHOTOS_DIR, OUTPUT_DIR):
     d.mkdir(parents=True, exist_ok=True)

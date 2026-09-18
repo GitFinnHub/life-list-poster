@@ -34,6 +34,7 @@ from .worker import start_worker  # noqa: E402
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 TAXONOMY_PATH = ROOT / "data" / "ebird_taxonomy.csv"
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # an eBird export is a few hundred KB at most
+MAX_PHOTO_UPLOAD_BYTES = 10 * 1024 * 1024  # a phone photo can be several MB
 PICKER_CANDIDATE_LIMIT = 4
 PUBLIC_PATHS = {"/login"}
 
@@ -197,11 +198,9 @@ async def customize_page(request: Request, job_id: str):
     species_view = []
     for sp in _job_species(job_id):
         code = sp["species_code"]
-        candidates = photo_library.get_or_fetch_candidates(
-            code, sp["scientific_name"], sp["common_name"]
-        )[:PICKER_CANDIDATE_LIMIT]
+        candidates = photo_library.get_candidates_for_job(code, job_id)[:PICKER_CANDIDATE_LIMIT]
         for c in candidates:
-            c["thumb_url"] = photo_library.square_url(c)
+            c["thumb_url"] = photo_library.thumb_url(c)
         default_id = photo_library.get_default_candidate_id(code)
         if default_id is None and candidates:
             default_id = candidates[0]["id"]
@@ -246,6 +245,119 @@ async def customize_submit(request: Request, job_id: str):
         conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (job_id,))
 
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+@app.get("/jobs/{job_id}/customize/upload/{species_code}", response_class=HTMLResponse)
+async def visitor_upload_form(request: Request, job_id: str, species_code: str):
+    job = _get_job(job_id)
+    if job is None or job["status"] != "picking":
+        raise HTTPException(404, "Not available.")
+    sp = _job_species_one(job_id, species_code)
+    if sp is None:
+        raise HTTPException(404, "That bird isn't on this list.")
+    return templates.TemplateResponse(request, "upload_photo.html", {
+        "common_name": sp["common_name"],
+        "action": f"/jobs/{job_id}/customize/upload/{species_code}",
+        "back_url": f"/jobs/{job_id}/customize",
+        "hint": "Only used for your own poster.",
+        "error": None,
+    })
+
+
+@app.post("/jobs/{job_id}/customize/upload/{species_code}")
+async def visitor_upload_submit(request: Request, job_id: str, species_code: str, photo: UploadFile = File(...)):
+    job = _get_job(job_id)
+    if job is None or job["status"] != "picking":
+        raise HTTPException(404, "Not available.")
+    sp = _job_species_one(job_id, species_code)
+    if sp is None:
+        raise HTTPException(404, "That bird isn't on this list.")
+
+    content = await photo.read()
+    if len(content) > MAX_PHOTO_UPLOAD_BYTES:
+        return _upload_error(request, sp["common_name"],
+                              f"/jobs/{job_id}/customize/upload/{species_code}",
+                              f"/jobs/{job_id}/customize", "Only used for your own poster.",
+                              "That image is too large (10MB limit).")
+    try:
+        photo_library.save_visitor_upload(
+            job_id, species_code, sp["scientific_name"], sp["common_name"],
+            job["visitor_name"], content,
+        )
+    except photo_library.InvalidImageError as e:
+        return _upload_error(request, sp["common_name"],
+                              f"/jobs/{job_id}/customize/upload/{species_code}",
+                              f"/jobs/{job_id}/customize", "Only used for your own poster.", str(e))
+
+    return RedirectResponse(f"/jobs/{job_id}/customize", status_code=303)
+
+
+@app.get("/admin/photos", response_class=HTMLResponse)
+async def admin_photos_page(request: Request):
+    # NOTE: unprotected for now, same as /admin/coolness (see its own note).
+    with db.get_db() as conn:
+        species_rows = conn.execute(
+            "SELECT species_code, common_name, scientific_name FROM species ORDER BY common_name"
+        ).fetchall()
+        defaults = {
+            r["species_code"]: dict(r)
+            for r in conn.execute(
+                """SELECT spd.species_code, cp.id, cp.source, cp.medium_url, cp.large_url, cp.attribution
+                   FROM species_photo_default spd JOIN candidate_photos cp ON cp.id = spd.candidate_photo_id"""
+            ).fetchall()
+        }
+    species_view = []
+    for sp in species_rows:
+        code = sp["species_code"]
+        current = defaults.get(code)
+        species_view.append({
+            **dict(sp),
+            "current_thumb": photo_library.thumb_url(current) if current else None,
+            "current_source": current["source"] if current else None,
+        })
+    return templates.TemplateResponse(request, "admin_photos.html", {"species": species_view})
+
+
+@app.get("/admin/photos/upload/{species_code}", response_class=HTMLResponse)
+async def admin_upload_form(request: Request, species_code: str):
+    sp = _get_species(species_code)
+    if sp is None:
+        raise HTTPException(404, "Unknown species.")
+    return templates.TemplateResponse(request, "upload_photo.html", {
+        "common_name": sp["common_name"],
+        "action": f"/admin/photos/upload/{species_code}",
+        "back_url": "/admin/photos",
+        "hint": "Becomes everyone's default photo for this species, tagged \"Photo by Finn\".",
+        "error": None,
+    })
+
+
+@app.post("/admin/photos/upload/{species_code}")
+async def admin_upload_submit(request: Request, species_code: str, photo: UploadFile = File(...)):
+    sp = _get_species(species_code)
+    if sp is None:
+        raise HTTPException(404, "Unknown species.")
+
+    content = await photo.read()
+    if len(content) > MAX_PHOTO_UPLOAD_BYTES:
+        return _upload_error(request, sp["common_name"], f"/admin/photos/upload/{species_code}",
+                              "/admin/photos", "Becomes everyone's default photo for this species.",
+                              "That image is too large (10MB limit).")
+    try:
+        photo_library.save_admin_upload(species_code, sp["scientific_name"], sp["common_name"], content)
+    except photo_library.InvalidImageError as e:
+        return _upload_error(request, sp["common_name"], f"/admin/photos/upload/{species_code}",
+                              "/admin/photos", "Becomes everyone's default photo for this species.", str(e))
+
+    return RedirectResponse("/admin/photos", status_code=303)
+
+
+@app.get("/photo/{candidate_id}")
+async def serve_uploaded_photo(candidate_id: int):
+    candidate = photo_library.get_candidate(candidate_id)
+    if candidate is None or not candidate.get("local_path"):
+        raise HTTPException(404, "Not found.")
+    return FileResponse(candidate["local_path"], media_type="image/jpeg")
 
 
 @app.get("/jobs/{job_id}/poster.png")
@@ -312,3 +424,29 @@ def _job_species(job_id):
             (job_id,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def _job_species_one(job_id, species_code):
+    with db.get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM job_species WHERE job_id=? AND species_code=?",
+            (job_id, species_code),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def _get_species(species_code):
+    with db.get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM species WHERE species_code=?", (species_code,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def _upload_error(request, common_name, action, back_url, hint, error):
+    return templates.TemplateResponse(
+        request, "upload_photo.html",
+        {"common_name": common_name, "action": action, "back_url": back_url,
+         "hint": hint, "error": error},
+        status_code=400,
+    )

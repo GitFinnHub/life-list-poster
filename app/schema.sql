@@ -22,7 +22,10 @@ CREATE TABLE IF NOT EXISTS candidate_photos (
     license_code TEXT,
     attribution TEXT,
     curator_rank INTEGER,
-    fetched_at TEXT
+    fetched_at TEXT,
+    source TEXT NOT NULL DEFAULT 'inaturalist',  -- inaturalist | admin_upload | visitor_upload
+    local_path TEXT,          -- for admin_upload/visitor_upload: where the file lives on disk
+    uploaded_for_job_id TEXT  -- only set for visitor_upload: scopes it private to that one job
 );
 
 CREATE TABLE IF NOT EXISTS species_photo_default (
