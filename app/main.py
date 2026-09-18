@@ -28,10 +28,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from lib import life_list  # noqa: E402
 
 from . import db, photo_library  # noqa: E402
+from .paths import UPLOAD_TMP_DIR  # noqa: E402
 from .worker import start_worker  # noqa: E402
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-UPLOAD_TMP_DIR = ROOT / "app_data" / "uploads"
 TAXONOMY_PATH = ROOT / "data" / "ebird_taxonomy.csv"
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # an eBird export is a few hundred KB at most
 PICKER_CANDIDATE_LIMIT = 4

@@ -24,16 +24,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from lib import cutouts, photos, poster  # noqa: E402
 
 from . import coolness, db, photo_library  # noqa: E402
+from .paths import CUTOUTS_DIR, MANUAL_DIR, OUTPUT_DIR, PHOTOS_DIR  # noqa: E402
 
-CACHE_DIR = ROOT / "cache"
-PHOTOS_DIR = CACHE_DIR / "photos"
-CUTOUTS_DIR = CACHE_DIR / "cutouts"
-MANUAL_DIR = CACHE_DIR / "cutouts_manual"
-OUTPUT_DIR = ROOT / "output" / "jobs"
 POLL_INTERVAL_S = 2
-
-for d in (PHOTOS_DIR, CUTOUTS_DIR, MANUAL_DIR, OUTPUT_DIR):
-    d.mkdir(parents=True, exist_ok=True)
 
 
 def _now():

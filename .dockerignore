@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+cache/
+output/
+app_data/
+.git/
+.env
+*.db
+*.sqlite3
+docker_test_state/
+
+# Never bake anyone's personal eBird sighting history into the image
+data/MyEBirdData.csv

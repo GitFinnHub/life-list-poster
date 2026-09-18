@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: life-list-poster
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # cheapest plan with persistent disk support - check Render's current pricing
+    healthCheckPath: /login
+    envVars:
+      - key: SITE_PASSWORD
+        sync: false # you'll be prompted to enter this when deploying
+      - key: SESSION_SECRET
+        generateValue: true # Render generates and stores this for you
+      - key: DATA_DIR
+        value: /app/state
+    disk:
+      name: state
+      mountPath: /app/state
+      sizeGB: 1

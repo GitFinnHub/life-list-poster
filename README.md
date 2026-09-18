@@ -1,11 +1,21 @@
 # Life List Poster
 
 Turns your eBird life list into a high-class poster: every species you've seen,
-cut out of its photo, grouped by family, on a cream background, in a serif
-field-guide style.
+cut out of its photo, densely scattered across a cream background, in a serif
+field-guide style — with real birds sized bigger the "cooler" they're ranked.
 
 `output/sample_demo_poster.png` is a demo made from 15 sample species — that's
 the look you'll get, just much bigger once your real list is in.
+
+## Website
+
+There's also a small web app (`app/`) that wraps this same pipeline with a
+photo picker, per-species size ranking, and a job queue — built for
+friends/family to generate their own posters without touching a terminal.
+Run it locally with `uvicorn app.main:app --reload` (needs `.env` — see
+`.env.example`), or see [DEPLOY.md](DEPLOY.md) to put it on real hosting.
+
+The rest of this README covers the plain command-line tool.
 
 ## 1. Export your life list from eBird
 
