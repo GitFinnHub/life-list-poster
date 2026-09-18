@@ -27,6 +27,7 @@ from . import coolness, db, photo_library  # noqa: E402
 from .paths import CUTOUTS_DIR, MANUAL_DIR, OUTPUT_DIR, PHOTOS_DIR  # noqa: E402
 
 POLL_INTERVAL_S = 2
+MAX_AUTO_RESTARTS = 3  # give up and surface an error after this many crash/restart cycles
 
 
 def _now():
@@ -34,14 +35,35 @@ def _now():
 
 
 def _reconcile_stuck_jobs():
-    """A job left mid-flight means the server died (crash/redeploy) -
-    surface that as an error instead of leaving it stuck forever."""
+    """A job left mid-flight means the server died (crash, redeploy, host
+    restart). Resume it rather than forcing the visitor to start over -
+    every step so far (candidate lookups, fetched photos, cutouts) is
+    cached by species code, so resuming just picks up where it left off,
+    often within seconds. Capped at MAX_AUTO_RESTARTS so a job that
+    reliably crashes the process (e.g. a genuine out-of-memory job) can't
+    loop forever - it surfaces as a real error after a few tries instead."""
     with db.get_db() as conn:
-        conn.execute(
-            """UPDATE jobs SET status='error', error_message=?, finished_at=?
-               WHERE status IN ('gathering_photos', 'running')""",
-            ("Interrupted by a server restart - please try again.", _now()),
-        )
+        stuck = conn.execute(
+            "SELECT id, status, restart_count FROM jobs WHERE status IN ('gathering_photos', 'running')"
+        ).fetchall()
+        for row in stuck:
+            if row["restart_count"] >= MAX_AUTO_RESTARTS:
+                conn.execute(
+                    "UPDATE jobs SET status='error', error_message=?, finished_at=? WHERE id=?",
+                    (
+                        f"Kept failing after {row['restart_count']} automatic retries. "
+                        "This usually means the server ran out of memory - try again, or "
+                        "let the site owner know if it keeps happening.",
+                        _now(),
+                        row["id"],
+                    ),
+                )
+            else:
+                resume_status = "queued_candidates" if row["status"] == "gathering_photos" else "queued"
+                conn.execute(
+                    "UPDATE jobs SET status=?, restart_count=restart_count+1 WHERE id=?",
+                    (resume_status, row["id"]),
+                )
 
 
 def _next_job():
