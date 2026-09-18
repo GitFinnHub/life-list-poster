@@ -7,15 +7,25 @@ field-guide style — with real birds sized bigger the "cooler" they're ranked.
 `output/sample_demo_poster.png` is a demo made from 15 sample species — that's
 the look you'll get, just much bigger once your real list is in.
 
-## Website
+## Website (local use)
 
 There's also a small web app (`app/`) that wraps this same pipeline with a
-photo picker, per-species size ranking, and a job queue — built for
-friends/family to generate their own posters without touching a terminal.
-Run it locally with `uvicorn app.main:app --reload` (needs `.env` — see
-`.env.example`), or see [DEPLOY.md](DEPLOY.md) to put it on real hosting.
+photo picker, per-species size ranking, and a job queue — nicer than the
+command line if you're making a poster for someone else and don't want to
+type commands.
 
-The rest of this README covers the plain command-line tool.
+**Double-click `Start Website.bat`** — it starts the site and opens your
+browser to it automatically (first launch takes ~15 seconds). Log in with
+the password in `.env` (`SITE_PASSWORD`). Close the window it opens when
+you're done; nothing keeps running in the background after that.
+
+This runs entirely on your own computer — no hosting, no ongoing cost.
+(It's also possible to deploy this to real hosting so anyone can use it
+without you running anything — see [DEPLOY.md](DEPLOY.md) — but that costs
+real money per month for the RAM this app's image processing needs, so
+this project currently just runs it locally instead.)
+
+The rest of this README covers the plain command-line tool underneath it.
 
 ## 1. Export your life list from eBird
 
