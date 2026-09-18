@@ -11,6 +11,14 @@ _SESSION = None
 # to fully transparent so cutouts have a clean edge instead of a smudgy one.
 ALPHA_CLEAN_THRESHOLD = 40
 
+# Downloaded source photos can be 1500px+ on a side; nothing in the poster
+# ever displays a bird anywhere near that large (see poster.py's own
+# IMAGE_MAX_DIM cap). Segmentation is the single most memory-hungry step in
+# the whole pipeline, so shrinking the input before it - not just the
+# output afterward - is what actually reduces its peak memory use, which
+# matters a lot on a memory-constrained host.
+SEGMENT_MAX_DIM = 1000
+
 
 def _session():
     global _SESSION
@@ -63,6 +71,8 @@ def get_cutout(code, photo_path, cutouts_dir, manual_dir, log=print, manual_code
 
     try:
         img = Image.open(photo_path).convert("RGB")
+        if max(img.size) > SEGMENT_MAX_DIM:
+            img.thumbnail((SEGMENT_MAX_DIM, SEGMENT_MAX_DIM), Image.LANCZOS)
         out = remove(img, session=_session())
         out = _clean_alpha(out)
         out.save(dest)

@@ -34,7 +34,14 @@ JITTER_HIGH = 1.34
 
 BASE_GAP = 6
 BASE_LABEL_GAP = 5
-IMAGE_MAX_DIM = 520
+# Every cutout gets fully decoded and held in memory at once for the whole
+# layout pass (see _build_image_cache) - on a memory-constrained host, this
+# is a real per-image cost multiplied by list size. 400px covers every
+# normal render size (BASE_BIRD_H=300, jitter tops out ~1.3x); only the
+# rare species at max "coolness" boost *and* max jitter *and* full poster
+# scale would mildly upscale from this - a small tradeoff for materially
+# lower peak memory across a large life list.
+IMAGE_MAX_DIM = 400
 
 WIDTHS_IN = [24, 30, 36, 40, 44]
 TARGET_MAX_HEIGHT_IN = 48
